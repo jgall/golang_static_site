@@ -1,12 +1,5 @@
 package main
 
-// https://blog.kowalczyk.info/article/Jl3G/https-for-free-in-go.html
-// To run:
-// go run main.go
-// Command-line options:
-//   -production : enables HTTPS on port 443
-//   -redirect-to-https : redirect HTTP to HTTTPS
-
 import (
 	"flag"
 	"io"
