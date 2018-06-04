@@ -2,15 +2,10 @@ package main
 
 import (
 	"flag"
-	"io"
 	"log"
 	"net/http"
 
 	"github.com/jgall/golang_static_site/pkg/server"
-)
-
-const (
-	htmlIndex = `<html><body>Welcome fren</body></html>`
 )
 
 var (
@@ -20,10 +15,6 @@ var (
 	httpsPort = "443"
 	httpPort  = "80"
 )
-
-func handleIndex(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, htmlIndex)
-}
 
 func makeHTTPToHTTPSRedirectMux() *http.ServeMux {
 	handleRedirect := func(w http.ResponseWriter, r *http.Request) {
@@ -35,9 +26,9 @@ func makeHTTPToHTTPSRedirectMux() *http.ServeMux {
 	return mux
 }
 
-func makeMainMux() *http.ServeMux {
+func makeMainMux(dir string) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleIndex)
+	mux.Handle("/", http.FileServer(http.Dir(dir)))
 	return mux
 }
 
@@ -55,7 +46,7 @@ func main() {
 
 	if flgHTTPS {
 		httpsSrv := &server.HTTPSServer{
-			Mux:         makeMainMux(),
+			Mux:         makeMainMux(directory),
 			Port:        httpsPort,
 			TLSDataDir:  ".",
 			AllowedHost: host,
@@ -74,7 +65,7 @@ func main() {
 		}
 	} else {
 		httpSrv := server.HTTPServer{
-			Mux:  makeMainMux(),
+			Mux:  makeMainMux(directory),
 			Port: httpPort,
 		}
 		log.Fatal(httpSrv.ListenAndServe())
