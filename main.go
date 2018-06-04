@@ -8,116 +8,72 @@ package main
 //   -redirect-to-https : redirect HTTP to HTTTPS
 
 import (
-	"context"
-	"crypto/tls"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"time"
 
-	"github.com/gorilla/handlers"
-	"golang.org/x/crypto/acme/autocert"
+	"github.com/jgall/golang_static_site/pkg/server"
 )
 
 const (
 	htmlIndex = `<html><body>Welcome fren</body></html>`
-	httpPort  = "127.0.0.1:8080"
 )
 
 var (
-	flgProduction          = false
-	flgRedirectHTTPToHTTPS = false
-	directory              = "test"
+	flgHTTPS  = true
+	directory = "test"
+	host      = ""
 )
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, htmlIndex)
 }
 
-func makeServerFromMux(mux *http.ServeMux) *http.Server {
-	// set timeouts so that a slow or malicious client doesn't
-	// hold resources forever
-	return &http.Server{
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  120 * time.Second,
-		Handler:      handlers.LoggingHandler(os.Stdout, mux),
-	}
-}
-
-func makeHTTPServer() *http.Server {
-	mux := &http.ServeMux{}
-	mux.HandleFunc("/", handleIndex)
-	return makeServerFromMux(mux)
-
-}
-
-func makeHTTPToHTTPSRedirectServer() *http.Server {
+func makeHTTPToHTTPSRedirectMux() *http.ServeMux {
 	handleRedirect := func(w http.ResponseWriter, r *http.Request) {
 		newURI := "https://" + r.Host + r.URL.String()
 		http.Redirect(w, r, newURI, http.StatusFound)
 	}
 	mux := &http.ServeMux{}
 	mux.HandleFunc("/", handleRedirect)
-	return makeServerFromMux(mux)
+	return mux
+}
+
+func makeMainMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", handleIndex)
+	return mux
 }
 
 func parseFlags() {
-	flag.BoolVar(&flgProduction, "production", false, "if true, we start HTTPS server")
-	flag.StringVar(&directory, "directory", "test", "the directory from which to serve files")
+	flag.BoolVar(&flgHTTPS, "https", true, "if true, we start HTTPS server")
+	flag.StringVar(&directory, "dir", "test", "the directory from which to serve files")
+	flag.StringVar(&host, "host", "", "the host you're running on")
 	flag.Parse()
 }
 
 func main() {
 	parseFlags()
-	var m *autocert.Manager
 
-	var httpsSrv *http.Server
-	if flgProduction {
-		hostPolicy := func(ctx context.Context, host string) error {
-			// Note: change to your real host
-			allowedHost := "droplet.johng.site"
-			if host == allowedHost {
-				return nil
-			}
-			return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+	if flgHTTPS {
+		httpsSrv := &server.HTTPSServer{
+			Mux:         makeMainMux(),
+			Port:        "443",
+			TLSDataDir:  ".",
+			AllowedHost: host,
 		}
-
-		dataDir := "."
-		m = &autocert.Manager{
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: hostPolicy,
-			Cache:      autocert.DirCache(dataDir),
+		httpSrv := &server.HTTPServer{
+			Mux:  makeHTTPToHTTPSRedirectMux(),
+			Port: "80",
 		}
-
-		httpsSrv = makeHTTPServer()
-		httpsSrv.Addr = ":443"
-		httpsSrv.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
-
-		go func() {
-			fmt.Printf("Starting HTTPS server on %s\n", httpsSrv.Addr)
-			err := httpsSrv.ListenAndServeTLS("", "")
-			if err != nil {
-				log.Fatalf("httpsSrv.ListendAndServeTLS() failed with %s", err)
-			}
-		}()
-	}
-
-	var httpSrv *http.Server
-	httpSrv = makeHTTPToHTTPSRedirectServer()
-
-	// allow autocert handle Let's Encrypt callbacks over http
-	if m != nil {
-		httpSrv.Handler = m.HTTPHandler(httpSrv.Handler)
-	}
-
-	httpSrv.Addr = httpPort
-	fmt.Printf("Starting HTTP server on %s\n", httpPort)
-	err := httpSrv.ListenAndServe()
-	if err != nil {
-		log.Fatalf("httpSrv.ListenAndServe() failed with %s", err)
+		go log.Fatal(httpsSrv.ListenAndServe())
+		go log.Fatal(httpSrv.ListenAndServe())
+	} else {
+		httpSrv := server.HTTPServer{
+			Mux:  makeMainMux(),
+			Port: "80",
+		}
+		log.Fatal(httpSrv.ListenAndServe())
 	}
 }
