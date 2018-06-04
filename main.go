@@ -17,6 +17,8 @@ var (
 	flgHTTPS  = true
 	directory = "test"
 	host      = ""
+	httpsPort = "443"
+	httpPort  = "80"
 )
 
 func handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +45,8 @@ func parseFlags() {
 	flag.BoolVar(&flgHTTPS, "https", true, "if true, we start HTTPS server")
 	flag.StringVar(&directory, "dir", "test", "the directory from which to serve files")
 	flag.StringVar(&host, "host", "", "the host you're running on")
+	flag.StringVar(&httpsPort, "httpsPort", "443", "https listening port")
+	flag.StringVar(&httpPort, "httpPort", "80", "http listening port")
 	flag.Parse()
 }
 
@@ -52,20 +56,26 @@ func main() {
 	if flgHTTPS {
 		httpsSrv := &server.HTTPSServer{
 			Mux:         makeMainMux(),
-			Port:        "443",
+			Port:        httpsPort,
 			TLSDataDir:  ".",
 			AllowedHost: host,
 		}
 		httpSrv := &server.HTTPServer{
 			Mux:  makeHTTPToHTTPSRedirectMux(),
-			Port: "80",
+			Port: httpPort,
 		}
-		go log.Fatal(httpsSrv.ListenAndServe())
-		go log.Fatal(httpSrv.ListenAndServe())
+		errChan := make(chan error)
+		go func() { errChan <- httpsSrv.ListenAndServe() }()
+		go func() { errChan <- httpSrv.ListenAndServe() }()
+		if err := <-errChan; err != nil {
+			// Quit on the first error that comes through the error channel
+			log.Fatal(err)
+			panic(err)
+		}
 	} else {
 		httpSrv := server.HTTPServer{
 			Mux:  makeMainMux(),
-			Port: "80",
+			Port: httpPort,
 		}
 		log.Fatal(httpSrv.ListenAndServe())
 	}
