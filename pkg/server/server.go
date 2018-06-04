@@ -19,14 +19,15 @@ type Server interface {
 
 // HTTPSServer represents everything needed to run an https server
 type HTTPSServer struct {
-	Mux         *http.ServeMux
+	Mux         http.Handler
 	Port        string
 	TLSDataDir  string
 	AllowedHost string
+	srv         *http.Server
 }
 
-// ListenAndServe listens and serves on the port of the calling server
-func (s *HTTPSServer) ListenAndServe() error {
+// InitAutocert configures the http server and returns the autocert manager
+func (s *HTTPSServer) InitAutocert() *autocert.Manager {
 	hostPolicy := func(ctx context.Context, host string) error {
 		if host == s.AllowedHost {
 			return nil
@@ -38,7 +39,8 @@ func (s *HTTPSServer) ListenAndServe() error {
 		HostPolicy: hostPolicy,
 		Cache:      autocert.DirCache(s.TLSDataDir),
 	}
-	srv := &http.Server{
+	m.GetCertificate(&tls.ClientHelloInfo{})
+	s.srv = &http.Server{
 		Handler:      handlers.LoggingHandler(os.Stdout, s.Mux),
 		Addr:         ":" + s.Port,
 		WriteTimeout: 15 * time.Second,
@@ -47,12 +49,17 @@ func (s *HTTPSServer) ListenAndServe() error {
 			GetCertificate: m.GetCertificate,
 		},
 	}
-	return srv.ListenAndServeTLS("", "")
+	return m
+}
+
+// ListenAndServe listens and serves on the port of the calling server
+func (s *HTTPSServer) ListenAndServe() error {
+	return s.srv.ListenAndServeTLS("", "")
 }
 
 // HTTPServer represents everything needed to run an http server
 type HTTPServer struct {
-	Mux  *http.ServeMux
+	Mux  http.Handler
 	Port string
 }
 

@@ -51,8 +51,9 @@ func main() {
 			TLSDataDir:  ".",
 			AllowedHost: host,
 		}
+		m := httpsSrv.InitAutocert()
 		httpSrv := &server.HTTPServer{
-			Mux:  makeHTTPToHTTPSRedirectMux(),
+			Mux:  m.HTTPHandler(makeHTTPToHTTPSRedirectMux()),
 			Port: httpPort,
 		}
 		errChan := make(chan error)
