@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/jgall/golang_static_site/pkg/server"
+	"github.com/jgall/easyhttps"
 )
 
 var (
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	if flgHTTPS {
-		httpsSrv := server.WrapHTTPS(srv, ":"+httpsPort, ".", host)
+		httpsSrv := easyhttps.WrapHTTPS(srv, ":"+httpsPort, ".", host)
 		log.Fatal(httpsSrv.ListenAndServe())
 	} else {
 		log.Fatal(srv.ListenAndServe())
