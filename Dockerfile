@@ -10,7 +10,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o serve
 FROM alpine
 WORKDIR /app
 COPY --from=goBuilder /go/src/serve .
-RUN apk update && apk add ca-certificates
-RUN update-ca-certificates
+COPY --from=goBuilder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 ENTRYPOINT ["./serve"]
