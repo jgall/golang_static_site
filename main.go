@@ -16,12 +16,6 @@ var (
 	httpPort  = "80"
 )
 
-func makeMainMux(dir string) *http.ServeMux {
-	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir(dir)))
-	return mux
-}
-
 func parseFlags() {
 	flag.BoolVar(&flgHTTPS, "https", true, "if true, we start HTTPS server")
 	flag.StringVar(&directory, "dir", "test", "the directory from which to serve files")
@@ -34,7 +28,7 @@ func parseFlags() {
 func main() {
 	parseFlags()
 	srv := &http.Server{
-		Handler: makeMainMux(directory),
+		Handler: http.FileServer(http.Dir(directory)),
 		Addr:    ":" + httpPort,
 	}
 
