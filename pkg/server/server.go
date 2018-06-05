@@ -17,10 +17,44 @@ type Server interface {
 	ListenAndServe() error
 }
 
+// WrapHTTPS wraps an http server in HTTPS TLS
+func WrapHTTPS(s *http.Server, tlsAddr, cacheDir, host string) Server {
+	httpsSrv := &HTTPSServer{
+		Handler:     s.Handler,
+		Addr:        tlsAddr,
+		TLSDataDir:  cacheDir,
+		AllowedHost: host,
+	}
+	m := httpsSrv.InitAutocert()
+	httpSrv := &HTTPServer{
+		Handler: makeHTTPToHTTPSRedirectMux(m),
+		Addr:    s.Addr,
+	}
+
+	return &RedirectHTTPSServer{
+		HTTPServer:  httpSrv,
+		HTTPSServer: httpsSrv,
+	}
+}
+
+// RedirectHTTPSServer redirects traffic going to the httpServer to the https server
+type RedirectHTTPSServer struct {
+	*HTTPSServer
+	*HTTPServer
+}
+
+// ListenAndServe listen and serves on the calling server
+func (s *RedirectHTTPSServer) ListenAndServe() error {
+	errChan := make(chan error)
+	go func() { errChan <- s.HTTPSServer.ListenAndServe() }()
+	go func() { errChan <- s.HTTPServer.ListenAndServe() }()
+	return <-errChan
+}
+
 // HTTPSServer represents everything needed to run an https server
 type HTTPSServer struct {
-	Mux         http.Handler
-	Port        string
+	Handler     http.Handler
+	Addr        string
 	TLSDataDir  string
 	AllowedHost string
 	srv         *http.Server
@@ -41,8 +75,8 @@ func (s *HTTPSServer) InitAutocert() *autocert.Manager {
 	}
 	m.GetCertificate(&tls.ClientHelloInfo{})
 	s.srv = &http.Server{
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Mux),
-		Addr:         ":" + s.Port,
+		Handler:      handlers.LoggingHandler(os.Stdout, s.Handler),
+		Addr:         s.Addr,
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 		TLSConfig: &tls.Config{
@@ -59,15 +93,15 @@ func (s *HTTPSServer) ListenAndServe() error {
 
 // HTTPServer represents everything needed to run an http server
 type HTTPServer struct {
-	Mux  http.Handler
-	Port string
+	Handler http.Handler
+	Addr    string
 }
 
 // ListenAndServe listens and serves on the calling server's port
 func (s *HTTPServer) ListenAndServe() error {
 	srv := &http.Server{
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Mux),
-		Addr:         ":" + s.Port,
+		Handler:      handlers.LoggingHandler(os.Stdout, s.Handler),
+		Addr:         s.Addr,
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}

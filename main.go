@@ -16,16 +16,6 @@ var (
 	httpPort  = "80"
 )
 
-func makeHTTPToHTTPSRedirectMux() *http.ServeMux {
-	handleRedirect := func(w http.ResponseWriter, r *http.Request) {
-		newURI := "https://" + r.Host + r.URL.String()
-		http.Redirect(w, r, newURI, http.StatusFound)
-	}
-	mux := &http.ServeMux{}
-	mux.HandleFunc("/", handleRedirect)
-	return mux
-}
-
 func makeMainMux(dir string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.Dir(dir)))
@@ -43,32 +33,15 @@ func parseFlags() {
 
 func main() {
 	parseFlags()
+	srv := &http.Server{
+		Handler: makeMainMux(directory),
+		Addr:    ":" + httpPort,
+	}
 
 	if flgHTTPS {
-		httpsSrv := &server.HTTPSServer{
-			Mux:         makeMainMux(directory),
-			Port:        httpsPort,
-			TLSDataDir:  ".",
-			AllowedHost: host,
-		}
-		m := httpsSrv.InitAutocert()
-		httpSrv := &server.HTTPServer{
-			Mux:  m.HTTPHandler(makeHTTPToHTTPSRedirectMux()),
-			Port: httpPort,
-		}
-		errChan := make(chan error)
-		go func() { errChan <- httpsSrv.ListenAndServe() }()
-		go func() { errChan <- httpSrv.ListenAndServe() }()
-		if err := <-errChan; err != nil {
-			// Quit on the first error that comes through the error channel
-			log.Fatal(err)
-			panic(err)
-		}
+		httpsSrv := server.WrapHTTPS(srv, ":"+httpsPort, ".", host)
+		log.Fatal(httpsSrv.ListenAndServe())
 	} else {
-		httpSrv := server.HTTPServer{
-			Mux:  makeMainMux(directory),
-			Port: httpPort,
-		}
-		log.Fatal(httpSrv.ListenAndServe())
+		log.Fatal(srv.ListenAndServe())
 	}
 }

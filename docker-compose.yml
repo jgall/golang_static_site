@@ -1,0 +1,12 @@
+version: '3'
+services:
+  server:
+    build: .
+    ports:
+      - "80:80"
+      - "443:443"
+    command: --httpPort=80 --httpsPort=443 --dir=/public --host=droplet.johng.site --https=true
+  redis:
+    image: "redis:alpine"
+    ports: 
+      - "6379:6379"
