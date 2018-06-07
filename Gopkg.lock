@@ -2,16 +2,10 @@
 
 
 [[projects]]
-  name = "github.com/gorilla/handlers"
-  packages = ["."]
-  revision = "90663712d74cb411cbef281bc1e08c19d1a76145"
-  version = "v1.3.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/jgall/easyhttps"
   packages = ["."]
-  revision = "17d4b9db6e14e6083b8bf74344571112272ec046"
+  revision = "b93b00efa86653a19c00d83fbbd114df4d014979"
 
 [[projects]]
   branch = "master"

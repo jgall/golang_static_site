@@ -7,9 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/gorilla/handlers"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -21,15 +19,25 @@ type Server interface {
 // WrapHTTPS wraps an http server in HTTPS TLS
 func WrapHTTPS(s *http.Server, tlsAddr, cacheDir, host string) Server {
 	httpsSrv := &HTTPSServer{
-		Handler:     s.Handler,
-		Addr:        tlsAddr,
 		TLSDataDir:  cacheDir,
 		AllowedHost: host,
+		srv: &http.Server{
+			Handler:      s.Handler,
+			Addr:         tlsAddr,
+			WriteTimeout: s.WriteTimeout,
+			ReadTimeout:  s.ReadTimeout,
+			IdleTimeout:  s.IdleTimeout,
+		},
 	}
 	m := httpsSrv.InitAutocert()
 	httpSrv := &HTTPServer{
-		Handler: makeHTTPToHTTPSRedirectMux(m),
-		Addr:    s.Addr,
+		srv: &http.Server{
+			Handler:      makeHTTPToHTTPSRedirectMux(m),
+			Addr:         s.Addr,
+			WriteTimeout: s.WriteTimeout,
+			ReadTimeout:  s.ReadTimeout,
+			IdleTimeout:  s.IdleTimeout,
+		},
 	}
 
 	return &RedirectHTTPSServer{
@@ -54,8 +62,6 @@ func (s *RedirectHTTPSServer) ListenAndServe() error {
 
 // HTTPSServer represents everything needed to run an https server
 type HTTPSServer struct {
-	Handler     http.Handler
-	Addr        string
 	TLSDataDir  string
 	AllowedHost string
 	srv         *http.Server
@@ -79,15 +85,10 @@ func (s *HTTPSServer) InitAutocert() *autocert.Manager {
 		Cache:      autocert.DirCache(s.TLSDataDir),
 	}
 	m.GetCertificate(&tls.ClientHelloInfo{})
-	s.srv = &http.Server{
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Handler),
-		Addr:         s.Addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		TLSConfig: &tls.Config{
-			GetCertificate: m.GetCertificate,
-		},
+	s.srv.TLSConfig = &tls.Config{
+		GetCertificate: m.GetCertificate,
 	}
+
 	return m
 }
 
@@ -98,17 +99,10 @@ func (s *HTTPSServer) ListenAndServe() error {
 
 // HTTPServer represents everything needed to run an http server
 type HTTPServer struct {
-	Handler http.Handler
-	Addr    string
+	srv *http.Server
 }
 
 // ListenAndServe listens and serves on the calling server's port
 func (s *HTTPServer) ListenAndServe() error {
-	srv := &http.Server{
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Handler),
-		Addr:         s.Addr,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-	}
-	return srv.ListenAndServe()
+	return s.srv.ListenAndServe()
 }

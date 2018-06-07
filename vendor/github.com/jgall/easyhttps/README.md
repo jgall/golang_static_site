@@ -9,7 +9,7 @@ A golang package for easy integration of https (using TLS) into existing http se
         Addr:    ":80",
       }
 
-      httpsSrv := easyhttps.WrapHTTPS(srv, ":443", ".", "example.com")
+      httpsSrv := easyhttps.WrapHTTPS(srv, ":443", "tlsCertCache", "example.com")
       log.Fatal(httpsSrv.ListenAndServe())
     }
    
