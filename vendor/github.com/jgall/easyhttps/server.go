@@ -32,7 +32,7 @@ func WrapHTTPS(s *http.Server, tlsAddr, cacheDir, host string) Server {
 	m := httpsSrv.InitAutocert()
 	httpSrv := &HTTPServer{
 		srv: &http.Server{
-			Handler:      makeHTTPToHTTPSRedirectMux(m),
+			Handler:      httpsSrv.makeHTTPToHTTPSRedirectMux(m),
 			Addr:         s.Addr,
 			WriteTimeout: s.WriteTimeout,
 			ReadTimeout:  s.ReadTimeout,

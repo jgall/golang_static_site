@@ -1,6 +1,7 @@
 package easyhttps
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,7 +9,7 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-func makeHTTPToHTTPSRedirectMux(m *autocert.Manager) http.HandlerFunc {
+func (s *HTTPSServer) makeHTTPToHTTPSRedirectMux(m *autocert.Manager) http.HandlerFunc {
 	hasHTTPS := false
 	handleRedirect := func(w http.ResponseWriter, r *http.Request) {
 		newURI := "https://" + r.Host + r.URL.String()
@@ -16,7 +17,7 @@ func makeHTTPToHTTPSRedirectMux(m *autocert.Manager) http.HandlerFunc {
 	}
 	callbackHandler := m.HTTPHandler(nil)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/.well-known/acme-challenge/") {
+		if _, err := m.Cache.Get(context.Background(), s.AllowedHost); strings.HasPrefix(r.URL.Path, "/.well-known/acme-challenge/") || err == nil {
 			callbackHandler.ServeHTTP(w, r)
 			hasHTTPS = true
 		} else if hasHTTPS {
